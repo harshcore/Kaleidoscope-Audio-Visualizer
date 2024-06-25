@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kaleidoscope Audio Visualizer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+      }
+      canvas {
+        display: block;
+      }
+      #audio-controls {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        z-index: 100;
+        opacity: 0;
+        transition: opacity 300ms ease-in-out;
+      }
+      #audio-controls:hover {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="visualizer"></canvas>
+    <div id="audio-controls">
+      <audio id="audio" src="1Dnce - One Dance.mp3" controls></audio>
+    </div>
+
+    <script>
+      const audio = document.getElementById("audio");
+      const canvas = document.getElementById("visualizer");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaElementSource(audio);
+
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const segments = 8;
+
+      function drawVisualizer() {
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const radius = Math.min(centerX, centerY) * 0.8;
+
+        for (let s = 0; s < segments; s++) {
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate((s * 2 * Math.PI) / segments);
+
+          const gradient = ctx.createLinearGradient(0, -radius, 0, radius);
+          gradient.addColorStop(0, `hsl(${(s * 360) / segments}, 100%, 50%)`);
+          gradient.addColorStop(
+            1,
+            `hsl(${((s + 1) * 360) / segments}, 100%, 50%)`
+          );
+
+          ctx.beginPath();
+          for (let i = 0; i < bufferLength; i++) {
+            const value = dataArray[i];
+            const percent = value / 255;
+            const height = radius * percent;
+            const offset = radius * 0.1;
+            const x = (i / bufferLength) * radius - radius / 2;
+            const y1 = -height + offset;
+            const y2 = height - offset;
+
+            ctx.lineTo(x, y1);
+          }
+          for (let i = bufferLength - 1; i >= 0; i--) {
+            const value = dataArray[i];
+            const percent = value / 255;
+            const height = radius * percent;
+            const offset = radius * 0.1;
+            const x = (i / bufferLength) * radius - radius / 2;
+            const y2 = height - offset;
+
+            ctx.lineTo(x, y2);
+          }
+          ctx.closePath();
+          ctx.fillStyle = gradient;
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        requestAnimationFrame(drawVisualizer);
+      }
+
+      audio.addEventListener("play", () => {
+        audioContext.resume().then(() => drawVisualizer());
+      });
+
+      window.addEventListener("resize", () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        centerX = canvas.width / 2;
+        centerY = canvas.height / 2;
+      });
+    </script>
+  </body>
+</html>
